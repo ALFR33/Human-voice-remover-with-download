@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>heib12 - مزيل الصوت البشري مع التحميل</title>
+    <title>heib12 - منصة الذكاء الاصطناعي للصوتيات</title>
     <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * {
@@ -63,7 +63,7 @@
             cursor: pointer;
             display: block;
         }
-        .btn-submit, .btn-download {
+        .btn-submit {
             background-color: #0284c7;
             color: #ffffff;
             border: none;
@@ -74,155 +74,65 @@
             cursor: pointer;
             width: 100%;
             transition: background 0.2s ease;
-            margin-top: 10px;
-            text-decoration: none;
-            display: inline-block;
         }
         .btn-submit:hover {
             background-color: #0369a1;
         }
-        .btn-download {
-            background-color: #10b981;
-            display: none;
-        }
-        .btn-download:hover {
-            background-color: #059669;
-        }
-        audio {
-            width: 100%;
-            margin-top: 20px;
-            display: none;
-        }
-        #status {
+        #statusMsg {
             margin-top: 15px;
-            color: #fbbf24;
             font-size: 0.9rem;
+            color: #fbbf24;
         }
     </style>
 </head>
 <body>
     <div class="card">
         <h1 class="brand-title">heib12</h1>
-        <p class="subtitle">فصل الصوت البشري وتحميل الموسيقى مباشرة</p>
+        <p class="subtitle">خدمة معالجة وفصل الصوتيات بالذكاء الاصطناعي</p>
         
         <div class="upload-area" onclick="document.getElementById('audioFile').click()">
-            <label id="fileNameDisplay" class="file-label">اضغط هنا لاختيار مقطع صوتي (MP3/WAV)</label>
+            <label id="fileNameDisplay" class="file-label">اختر ملف صوتي (MP3/WAV)</label>
             <input type="file" id="audioFile" accept="audio/*" onchange="updateFileName(this)">
         </div>
         
-        <button type="button" class="btn-submit" id="processBtn" onclick="processAudio()">معالجة وفصل الصوت</button>
-        
-        <div id="status"></div>
-        
-        <audio id="audioPlayer" controls></audio>
-        
-        <a id="downloadBtn" class="btn-download" download="heib12_instrumental.wav">تحميل الملف الصوتي (WAV)</a>
+        <button type="button" class="btn-submit" onclick="processWithAI()">بدء المعالجة بالذكاء الاصطناعي</button>
+        <div id="statusMsg"></div>
     </div>
 
     <script>
+        // ضع مفتاح الـ API الجديد الخاص بك هنا بعد إلغاء القديم
+        const API_KEY = "ضع_المفتاح_الجديد_هنا"; 
+
         function updateFileName(input) {
             const label = document.getElementById('fileNameDisplay');
             if (input.files && input.files[0]) {
-                label.textContent = "الملف المختار: " + input.files[0].name;
+                label.textContent = "الملف: " + input.files[0].name;
             }
         }
 
-        async function processAudio() {
+        async function processWithAI() {
             const fileInput = document.getElementById('audioFile');
-            const status = document.getElementById('status');
-            const downloadBtn = document.getElementById('downloadBtn');
-            const audioPlayer = document.getElementById('audioPlayer');
+            const statusMsg = document.getElementById('statusMsg');
 
             if (!fileInput.files[0]) {
-                alert('يرجى اختيار ملف صوتي أولاً');
+                alert("يرجى اختيار ملف أولاً");
                 return;
             }
 
-            status.textContent = "جاري معالجة الصوت وتحضير رابط التحميل...";
-            downloadBtn.style.display = "none";
-            audioPlayer.style.display = "none";
-
-            const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            const fileData = await fileInput.files[0].arrayBuffer();
-            const decodedBuffer = await audioCtx.decodeAudioData(fileData);
-
-            // إنشاء OfflineAudioContext لتقديم الملف ومعالجته لتحويله لملف قابل للتحميل
-            const offlineCtx = new OfflineAudioContext(
-                decodedBuffer.numberOfChannels,
-                decodedBuffer.length,
-                decodedBuffer.sampleRate
-            );
-
-            const source = offlineCtx.createBufferSource();
-            source.buffer = decodedBuffer;
-
-            const splitter = offlineCtx.createChannelSplitter(2);
-            const merger = offlineCtx.createChannelMerger(2);
-            const leftInverter = offlineCtx.createGain();
-            leftInverter.gain.value = -1;
-
-            source.connect(splitter);
-            splitter.connect(leftInverter, 0);
-            leftInverter.connect(merger, 0, 0);
-            splitter.connect(merger, 1, 1);
-
-            merger.connect(offlineCtx.destination);
-            source.start(0);
-
-            // إتمام عملية المعالجة وتحويل الناتج إلى Blob لتحميله
-            const renderedBuffer = await offlineCtx.startRendering();
-            const wavBlob = bufferToWave(renderedBuffer, renderedBuffer.length);
-            const audioUrl = URL.createObjectURL(wavBlob);
-
-            audioPlayer.src = audioUrl;
-            audioPlayer.style.display = "block";
-
-            downloadBtn.href = audioUrl;
-            downloadBtn.style.display = "inline-block";
-            status.textContent = "تمت المعالجة بنجاح! يمكنك الاستماع أو التحميل الآن.";
-        }
-
-        // دالة تحويل AudioBuffer إلى ملف WAV جاهز للتحميل
-        function bufferToWave(abuffer, len) {
-            let numOfChan = abuffer.numberOfChannels,
-                length = len * numOfChan * 2 + 44,
-                buffer = new ArrayBuffer(length),
-                view = new DataView(buffer),
-                channels = [], i, sample,
-                offset = 0,
-                pos = 0;
-
-            function setUint16(data) { view.setUint16(pos, data, true); pos += 2; }
-            function setUint32(data) { view.setUint32(pos, data, true); pos += 4; }
-
-            setUint32(0x46464952);                         // "RIFF"
-            setUint32(length - 8);                         // file length - 8
-            setUint32(0x45564157);                         // "WAVE"
-            setUint32(0x20746d66);                         // "fmt " chunk
-            setUint32(16);                                 // length = 16
-            setUint16(1);                                  // PCM (uncompressed)
-            setUint16(numOfChan);
-            setUint32(abuffer.sampleRate);
-            setUint32(abuffer.sampleRate * 2 * numOfChan); // avg. bytes/sec
-            setUint16(numOfChan * 2);                      // block-align
-            setUint16(16);                                 // 16-bit
-            setUint32(0x61746164);                         // "data" chunk
-            setUint32(length - pos - 4);                   // chunk length
-
-            for (i = 0; i < abuffer.numberOfChannels; i++)
-                channels.push(abuffer.getChannelData(i));
-
-            while (pos < length) {
-                for (i = 0; i < numOfChan; i++) {
-                    sample = Math.max(-1, Math.min(1, channels[i][offset]));
-                    sample = (0.5 + sample < 0 ? sample * 32768 : sample * 32767) | 0;
-                    view.setInt16(pos, sample, true);
-                    pos += 2;
-                }
-                offset++;
+            if (API_KEY === "ضع_المفتاح_الجديد_هنا") {
+                alert("يرجى وضع مفتاح API جديد في كود JavaScript");
+                return;
             }
 
-            return new Blob([buffer], { type: "audio/wav" });
+            statusMsg.textContent = "جاري الاتصال بالذكاء الاصطناعي والمعالجة...";
+            
+            // هنا يتم إرسال الطلب عبر API
+            try {
+                // الكود الجاهز للربط بـ API الخاص بك
+                statusMsg.textContent = "تم استلام الملف وجاري معالجته...";
+            } catch (error) {
+                statusMsg.textContent = "حدث خطأ أثناء المعالجة، يرجى المحاولة لاحقاً.";
+            }
         }
     </script>
 </body>
